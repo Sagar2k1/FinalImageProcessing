@@ -5,8 +5,8 @@ def red_detect(image):
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # Define the lower and upper bounds for the red color in RGB
-    lower_red = np.array([200, 0, 0])
-    upper_red = np.array([255, 100, 100])
+    lower_red = np.array([150, 0, 0])
+    upper_red = np.array([255, 50, 50])
 
     # Create a mask to filter out the red color
     red_mask = cv2.inRange(image_rgb, lower_red, upper_red)
@@ -18,67 +18,70 @@ def red_detect(image):
     result_bgr = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
     return result_bgr
 
+def brighten_image(image):
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            avg = int(np.average(image[i][j]))
+            # print(image[i][j], avg)
+            for k in range(image.shape[2]):
+                if image[i][j][k] > avg:
+                    image[i][j][k] = min(image[i][j][k] + (image[i][j][k] - avg), 255)
+                else:
+                    image[i][j][k] = max(image[i][j][k] + (image[i][j][k] - avg), 0)
+            # print(image[i][j],'/n')
+    return image
+
 def RGB_threshold(image):
     for i in range(3):
-        _, image[:,:,i] = cv2.threshold(image[:,:,i],160,255,cv2.THRESH_BINARY)
+        _, image[:,:,i] = cv2.threshold(image[:,:,i],100,255,cv2.THRESH_BINARY)
     return image
 
-def adaptive_histogram(image):
-    clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(8,8))
-    return clahe.apply(image)
+def get_predict_area(path):
+    # Read and resize image
+    image = cv2.imread(path)
+    image = cv2.resize(image, (1000, 600))
 
-def adaptive_histogram_for_RGB(image):
-    for i in range(3):
-        image[:,:,i] = adaptive_histogram(image[:,:,i])
-    return image
-def local_histogram_equalization(image, tile_size):
-    # Convert the image to grayscale if it's not already
-    if len(image.shape) == 3:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # make color brighter
+    result = brighten_image(image.copy())
 
-    # Resize the image to ensure it can be evenly divided into tiles
-    height, width = image.shape
-    height_resized = height - (height % tile_size[0])
-    width_resized = width - (width % tile_size[1])
-    print(height_resized, width_resized)
-    image = cv2.resize(image, (width_resized, height_resized))
-    # Divide the resized image into tiles
-    tiles = [image[x:x + tile_size[0], y:y + tile_size[1]] for x in range(0, height_resized, tile_size[0]) for y in range(0, width_resized, tile_size[1])]
-    # Apply histogram equalization to each tile
-    equalized_tiles = [cv2.equalizeHist(tile) for tile in tiles]
-    # Reconstruct the image from the equalized tiles
-    equalized_rows = [np.concatenate(equalized_tiles[i:i + int(width_resized / tile_size[1])], axis=1) for i in range(0, len(equalized_tiles), int(width_resized / tile_size[1]))]
-    for i in equalized_rows:
-        print(i.shape)
-    equalized_image = np.concatenate(equalized_rows, axis=0)
-    # equalized_image = np.concatenate([np.concatenate(equalized_tiles[i:i + int(width_resized / tile_size[1])], axis=0) for i in range(0, len(equalized_tiles), int(height_resized / tile_size[0]))], axis=1)
+    # get represent color of pixel
+    result = RGB_threshold(result)
 
-    return equalized_image
+    # detect red for banning sign
+    result = red_detect(result)
 
-# Read an image
-image = cv2.imread('D:/Project/ImgProcessing/FinalImageProcessing/8d3242e4-06d1-44aa-8f4b-074fb9977e35/3sCBWxeq.jpg')
-# Set the tile size (adjust as needed)
-tile_size = (50, 50)
 
-result = cv2.resize(image.copy(), (600,600))
-result = adaptive_histogram_for_RGB(result)
-result = RGB_threshold(result)
-result = red_detect(result)
-# result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-# result = cv2.Canny(result, 100, 200)
-# circles = cv2.HoughCircles(result, cv2.HOUGH_GRADIENT, 1, 80,
-#                                param1=150, param2=35,
-#                                minRadius=40, maxRadius=100)
-# if circles is not None:
-#     circles = np.uint16(np.around(circles))
-#     for i in circles[0, :]:
-#         center = (i[0], i[1])
-#         # circle center
-#         cv2.circle(result, center, 1, (0, 100, 100), 3)
-#         # circle outline
-#         radius = i[2]
-#         cv2.circle(result, center, radius, (255, 0, 255), 3)
-cv2.imshow('Original Image', image)
-cv2.imshow('Local Histogram Equalized Image', result)
+    result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+    _, result = cv2.threshold(result, 10, 255, cv2.THRESH_BINARY)
+
+    # noise filter
+    result = cv2.erode(result, np.ones((5,5), np.uint8), iterations=1)
+    result = cv2.dilate(result, np.ones((3,3), np.uint8), iterations=1)
+
+    # contour area
+    contours, _ = cv2.findContours(result, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    sign_chain = list()
+    for contour in contours:
+        # Get the bounding rectangle for each contour
+        x, y, w, h = cv2.boundingRect(contour)
+        
+        # Draw a rectangle on the original image
+        if w*h > 5000:
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            sign_chain.append(image[y:y+h, x:x+w, :])
+
+    return (image, sign_chain)
+
+    # cv2.imshow('Original Image', image)
+    # cv2.imshow('Local Histogram Equalized Image', result)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+image, sign_list = get_predict_area('../FinalImageProcessing/8d3242e4-06d1-44aa-8f4b-074fb9977e35/img_2217.jpg')
+
+cv2.imshow('Local Histogram Equalized Image', image)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+for i in sign_list:
+    cv2.imshow('Local Histogram Equalized Image', i)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
