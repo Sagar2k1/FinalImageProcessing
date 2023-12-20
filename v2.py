@@ -11,7 +11,7 @@ size_sample = (int(img_sample.shape[1]*1.5), int(img_sample.shape[0]*1.5))
 #img = img_sample.copy()
 color = {
     'red': {
-        'lower': np.array([170, 60, 70], dtype=np.uint8),
+        'lower': np.array([70, 60, 70], dtype=np.uint8),
         'upper': np.array([180, 255, 255], dtype=np.uint8)
         },
     'white': {
@@ -22,29 +22,37 @@ color = {
         'lower': np.array([40, 0, 40], dtype = np.uint8),
         'upper': np.array([110, 18, 230], dtype = np.uint8)
         }
-}
-for d in dirs:
-    p = os.path.join(path,d)
-    print('run: ', p)
-    img_sample = cv2.imread(p)
-    img_sample = cv2.resize(img_sample, size_sample)
-    img = img_sample.copy()
-    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(img_hsv, color['red']['lower'], color['red']['upper'])
-    mask = mask+cv2.inRange(img_hsv, color['white']['lower'], color['white']['upper'])
-    img_red = cv2.bitwise_and(img, img, mask=mask)
-    img = cv2.cvtColor(img_red, cv2.COLOR_BGR2GRAY)
-    _, thr = cv2.threshold(img,210, 255, cv2.THRESH_OTSU+cv2.THRESH_BINARY)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
     kernel2 = cv2.getStructuringElement(cv2.MORPH_CROSS,(2,2))
 
-    thr = cv2.erode(thr,kernel2,iterations=2,borderValue=2)
-    thr = cv2.erode(thr,kernel2,iterations=2)
-    thr = cv2.dilate(thr,kernel,iterations=2)
+    '''
     thr = cv2.erode(thr,kernel,iterations=1)
-
     kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT,(10,10))
     thr = cv2.morphologyEx(thr, cv2.MORPH_CLOSE, kernel2)
+    thr = cv2.erode(thr,kernel2,iterations=2)
+    '''
+
+    thr = cv2.bitwise_not(thr)
+    thr = cv2.Canny(thr, 100, 200)
+    thr = cv2.blur(thr, (3, 4))
+    rows = thr.shape[0]
+    circles = cv2.HoughCircles(thr, cv2.HOUGH_GRADIENT, 1, rows / 8,
+                               param1=50, param2=50,
+                               minRadius=20, maxRadius=200)
+    print(circles)
+    
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        for i in circles[0, :]:
+            center = (i[0], i[1])
+            # circle center
+            cv2.circle(thr, center, 1, (0, 100, 100), 3)
+            # circle outline
+            radius = i[2]
+            cv2.circle(thr, center, radius, (255, 0, 255), 3)
+        
+        
+    
+    '''
     contours, _ = cv2.findContours(thr, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     l = []
     for contour in contours:
@@ -56,31 +64,27 @@ for d in dirs:
             for x1, w1, y1,h1 in l:
                 if x in range(x1,x1+w1) or y in range(y1,y1+h1):
                     flag = 1
-            
             if flag==1:
-                continue
-            
+                continue           
             
             max, min = w, h
             if max<min:
                 max, min = min, max
-            if w > 30 and h > 30 and max/min<2:
-                
-                
+            if w > 30 and h > 30:              
                 
                 #print(min, max)
                 cv2.rectangle(img_sample, (x,y), (x+w,y+h), (127, 255, 0), 2)
                 l.append([x,x+w,y,y+h])
                 
             #print(len(approx))
+    '''
+
+    cv2.imshow('d',thr)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     cv2.imwrite('output/'+d, img_sample)
-    print('save: ', d)
+    print('save: ', 'output/'+d)
     
-
-
-
-
-# color range
 
 
 
