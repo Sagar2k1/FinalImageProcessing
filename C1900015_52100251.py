@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+# impo  rt matplotlib.pyplot as plt
 import os
 path = r'8d3242e4-06d1-44aa-8f4b-074fb9977e35/1-20220629-web-bien-bao-cam-do-xe-tai-diem-trong-giu-xe-co-thu-phi-47-083934.jpg'
 

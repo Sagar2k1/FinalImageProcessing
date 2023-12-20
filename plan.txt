@@ -1,0 +1,4 @@
+- ảnh chụp trong điều kiện: đủ ánh sáng
+- màu sắc biển báo: đỏ, vàng, xanh dương, trắng
+- hình dạng biển báo: tròn, vuông, chữ nhật, tam giác
+- các biển báo không đè lên nhau
